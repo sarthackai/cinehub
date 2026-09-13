@@ -4,7 +4,7 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
-
+from app.api.routes import content
 from app.api.routes import auth
 from app.core.config import settings
 from app.core.security import get_current_user_id
@@ -38,7 +38,7 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)
 
 app.include_router(auth.router)
-
+app.include_router(content.router)
 
 @app.get("/")
 def read_root():
