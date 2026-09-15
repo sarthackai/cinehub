@@ -28,14 +28,26 @@ class ContentSyncService:
     def __init__(self) -> None:
         self.provider = TMDBProvider()
         self.client = get_supabase_client()
-        self._genre_cache: dict[str, int] | None = None
+        self._our_genre_cache: dict[str, int] | None = None
+        self._tmdb_genre_id_to_name: dict[int, str] | None = None
 
-    def _get_genre_map(self) -> dict[str, int]:
-        """Cache genres table (name -> id) so we don't re-query per item."""
-        if self._genre_cache is None:
+    def _get_our_genre_map(self) -> dict[str, int]:
+        """Our internal genres table: name -> our genres.id"""
+        if self._our_genre_cache is None:
             result = self.client.table("genres").select("id, name").execute()
-            self._genre_cache = {row["name"]: row["id"] for row in result.data}
-        return self._genre_cache
+            self._our_genre_cache = {row["name"]: row["id"] for row in result.data}
+        return self._our_genre_cache
+
+    def _get_tmdb_genre_id_map(self) -> dict[int, str]:
+        """TMDB's own genre id -> name map (movie + tv combined)."""
+        if self._tmdb_genre_id_to_name is None:
+            movie_genres = self.provider._get("/genre/movie/list").get("genres", [])
+            tv_genres = self.provider._get("/genre/tv/list").get("genres", [])
+            merged: dict[int, str] = {}
+            for g in movie_genres + tv_genres:
+                merged[g["id"]] = g["name"]
+            self._tmdb_genre_id_to_name = merged
+        return self._tmdb_genre_id_to_name
 
     def _upsert_content(self, item: dict[str, Any], content_type: str) -> str | None:
         """Upsert a single raw TMDB item into `content`. Returns the content id."""
@@ -59,7 +71,6 @@ class ContentSyncService:
             "provider_vote_count": item.get("vote_count"),
             "popularity": item.get("popularity"),
         }
-        # TMDB sends empty string "" for missing dates sometimes; normalize to None
         if row["release_date"] == "":
             row["release_date"] = None
 
@@ -72,24 +83,39 @@ class ContentSyncService:
             return None
         return result.data[0]["id"]
 
-    def _link_genres(self, content_id: str, genre_ids: list[int]) -> None:
-        """Map TMDB genre_ids to our genres table by matching TMDB's genre names."""
-        if not genre_ids:
+    def _link_genres(self, content_id: str, tmdb_genre_ids: list[int]) -> None:
+        """Translate TMDB genre_ids -> our genre names -> our genres.id, then upsert
+        the (content_id, genre_id) rows into content_genres."""
+        if not tmdb_genre_ids:
             return
-        # We don't have TMDB's raw id->name map cached here beyond what seed_genres
-        # stored by name, so this relies on genre NAMES already existing (Step 8).
-        # For trending/popular list endpoints, TMDB only gives genre_ids, not names,
-        # so full genre linking happens in fetch_details() calls (fuller data) —
-        # this method is reserved for future entries where genre names ARE present.
-        pass
+
+        tmdb_id_to_name = self._get_tmdb_genre_id_map()
+        our_name_to_id = self._get_our_genre_map()
+
+        rows_to_insert = []
+        for tmdb_gid in tmdb_genre_ids:
+            genre_name = tmdb_id_to_name.get(tmdb_gid)
+            if not genre_name:
+                continue
+            our_genre_id = our_name_to_id.get(genre_name)
+            if not our_genre_id:
+                logger.warning("Genre '%s' not found in our genres table — run seed_genres.py", genre_name)
+                continue
+            rows_to_insert.append({"content_id": content_id, "genre_id": our_genre_id})
+
+        if rows_to_insert:
+            self.client.table("content_genres").upsert(
+                rows_to_insert, on_conflict="content_id,genre_id"
+            ).execute()
 
     def sync_batch(self, items: list[dict[str, Any]], content_type: str) -> dict[str, int]:
-        """Upsert a batch of raw TMDB items. Returns counts for logging."""
+        """Upsert a batch of raw TMDB items, including genre links. Returns counts."""
         succeeded = 0
         skipped = 0
         for item in items:
             content_id = self._upsert_content(item, content_type)
             if content_id:
+                self._link_genres(content_id, item.get("genre_ids", []))
                 succeeded += 1
             else:
                 skipped += 1
