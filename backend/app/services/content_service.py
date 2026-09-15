@@ -249,3 +249,28 @@ class ContentSyncService:
             "rows_processed": rows_processed,
             "error_message": error_message,
         }
+
+    def run_full_sync(self, include_credits: bool = False) -> dict[str, Any]:
+        """
+        Run every sync job (trending, popular, new_releases, upcoming) for
+        both movies and TV shows. Returns a summary of all runs. Each
+        individual job is still logged separately in sync_logs.
+        """
+        job_names = ["trending", "popular", "new_releases", "upcoming"]
+        content_types = ["movie", "tv"]
+
+        results = []
+        for content_type in content_types:
+            for job_name in job_names:
+                result = self.run_sync(job_name, content_type, include_credits=include_credits)
+                results.append({**result, "content_type": content_type})
+
+        total_succeeded = sum(r["rows_processed"] for r in results)
+        total_failed = sum(1 for r in results if r["status"] == "failed")
+
+        return {
+            "jobs_run": len(results),
+            "total_rows_processed": total_succeeded,
+            "jobs_failed": total_failed,
+            "details": results,
+     }       
