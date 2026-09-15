@@ -188,3 +188,64 @@ class ContentSyncService:
             else:
                 skipped += 1
         return {"succeeded": succeeded, "skipped": skipped, "total": len(items)}
+
+    def run_sync(
+        self,
+        job_name: str,
+        content_type: str = "movie",
+        include_credits: bool = False,
+    ) -> dict[str, Any]:
+        """
+        Run a named sync job (e.g. 'trending', 'popular', 'new_releases',
+        'upcoming'), fetch from TMDB, sync to DB, and record the outcome in
+        sync_logs regardless of success or failure.
+        """
+        from datetime import datetime, timezone
+
+        started_at = datetime.now(timezone.utc).isoformat()
+        status = "success"
+        error_message = None
+        rows_processed = 0
+
+        try:
+            fetch_map = {
+                "trending": self.provider.fetch_trending,
+                "popular": self.provider.fetch_popular,
+                "new_releases": self.provider.fetch_new_releases,
+                "upcoming": self.provider.fetch_upcoming,
+            }
+            fetch_fn = fetch_map.get(job_name)
+            if fetch_fn is None:
+                raise ValueError(f"Unknown job_name: {job_name}")
+
+            items = fetch_fn(content_type)
+            result = self.sync_batch(items, content_type, include_credits=include_credits)
+            rows_processed = result["succeeded"]
+            if result["skipped"] > 0:
+                status = "partial"
+
+        except Exception as exc:
+            status = "failed"
+            error_message = str(exc)
+            logger.exception("Sync job '%s' failed", job_name)
+
+        finished_at = datetime.now(timezone.utc).isoformat()
+
+        self.client.table("sync_logs").insert(
+            {
+                "job_name": job_name,
+                "provider": "tmdb",
+                "status": status,
+                "rows_processed": rows_processed,
+                "error_message": error_message,
+                "started_at": started_at,
+                "finished_at": finished_at,
+            }
+        ).execute()
+
+        return {
+            "job_name": job_name,
+            "status": status,
+            "rows_processed": rows_processed,
+            "error_message": error_message,
+        }
