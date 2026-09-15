@@ -1,5 +1,6 @@
 import logging
 
+from app.api.routes import admin
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
@@ -39,6 +40,7 @@ app.add_exception_handler(Exception, unhandled_exception_handler)
 
 app.include_router(auth.router)
 app.include_router(content.router)
+app.include_router(admin.router)
 
 @app.get("/")
 def read_root():
@@ -53,4 +55,3 @@ def health_check():
 @app.get("/api/auth/me")
 def get_me(user_id: str = Depends(get_current_user_id)):
     return {"user_id": user_id}
-
