@@ -14,6 +14,10 @@ logger = logging.getLogger("streamsync")
 
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w780"
 TMDB_BACKDROP_BASE = "https://image.tmdb.org/t/p/w1280"
+TMDB_PROFILE_BASE = "https://image.tmdb.org/t/p/w185"
+
+MAX_CAST_MEMBERS = 10  # keep top-billed cast only, avoid bloating the DB
+CREW_ROLES_TO_KEEP = {"Director", "Creator", "Writer"}
 
 
 def _poster_url(path: str | None) -> str | None:
@@ -24,6 +28,10 @@ def _backdrop_url(path: str | None) -> str | None:
     return f"{TMDB_BACKDROP_BASE}{path}" if path else None
 
 
+def _profile_url(path: str | None) -> str | None:
+    return f"{TMDB_PROFILE_BASE}{path}" if path else None
+
+
 class ContentSyncService:
     def __init__(self) -> None:
         self.provider = TMDBProvider()
@@ -32,14 +40,12 @@ class ContentSyncService:
         self._tmdb_genre_id_to_name: dict[int, str] | None = None
 
     def _get_our_genre_map(self) -> dict[str, int]:
-        """Our internal genres table: name -> our genres.id"""
         if self._our_genre_cache is None:
             result = self.client.table("genres").select("id, name").execute()
             self._our_genre_cache = {row["name"]: row["id"] for row in result.data}
         return self._our_genre_cache
 
     def _get_tmdb_genre_id_map(self) -> dict[int, str]:
-        """TMDB's own genre id -> name map (movie + tv combined)."""
         if self._tmdb_genre_id_to_name is None:
             movie_genres = self.provider._get("/genre/movie/list").get("genres", [])
             tv_genres = self.provider._get("/genre/tv/list").get("genres", [])
@@ -50,7 +56,6 @@ class ContentSyncService:
         return self._tmdb_genre_id_to_name
 
     def _upsert_content(self, item: dict[str, Any], content_type: str) -> str | None:
-        """Upsert a single raw TMDB item into `content`. Returns the content id."""
         title = item.get("title") or item.get("name")
         if not title or not item.get("id"):
             logger.warning("Skipping item with missing title/id: %s", item)
@@ -84,8 +89,6 @@ class ContentSyncService:
         return result.data[0]["id"]
 
     def _link_genres(self, content_id: str, tmdb_genre_ids: list[int]) -> None:
-        """Translate TMDB genre_ids -> our genre names -> our genres.id, then upsert
-        the (content_id, genre_id) rows into content_genres."""
         if not tmdb_genre_ids:
             return
 
@@ -108,14 +111,79 @@ class ContentSyncService:
                 rows_to_insert, on_conflict="content_id,genre_id"
             ).execute()
 
-    def sync_batch(self, items: list[dict[str, Any]], content_type: str) -> dict[str, int]:
-        """Upsert a batch of raw TMDB items, including genre links. Returns counts."""
+    def _upsert_person(self, tmdb_person_id: int, name: str, profile_path: str | None) -> str | None:
+        """Upsert a person (cast or crew member) and return our internal people.id."""
+        row = {
+            "external_id": str(tmdb_person_id),
+            "provider": "tmdb",
+            "name": name,
+            "profile_image_url": _profile_url(profile_path),
+        }
+        result = (
+            self.client.table("people")
+            .upsert(row, on_conflict="external_id,provider")
+            .execute()
+        )
+        if not result.data:
+            return None
+        return result.data[0]["id"]
+
+    def _link_cast_and_crew(self, content_id: str, external_id: str, content_type: str) -> None:
+        """Fetch full details (with credits) for one item and link cast/crew."""
+        details = self.provider.fetch_details(external_id, content_type)
+        credits = details.get("credits", {})
+
+        cast_list = credits.get("cast", [])[:MAX_CAST_MEMBERS]
+        cast_rows = []
+        for member in cast_list:
+            person_id = self._upsert_person(member["id"], member["name"], member.get("profile_path"))
+            if person_id:
+                cast_rows.append(
+                    {
+                        "content_id": content_id,
+                        "person_id": person_id,
+                        "character_name": member.get("character"),
+                        "cast_order": member.get("order"),
+                    }
+                )
+        if cast_rows:
+            self.client.table("content_cast").upsert(
+                cast_rows, on_conflict="content_id,person_id,character_name"
+            ).execute()
+
+        crew_list = [c for c in credits.get("crew", []) if c.get("job") in CREW_ROLES_TO_KEEP]
+        crew_rows = []
+        for member in crew_list:
+            person_id = self._upsert_person(member["id"], member["name"], member.get("profile_path"))
+            if person_id:
+                crew_rows.append(
+                    {
+                        "content_id": content_id,
+                        "person_id": person_id,
+                        "role": member["job"],
+                    }
+                )
+        if crew_rows:
+            self.client.table("content_crew").upsert(
+                crew_rows, on_conflict="content_id,person_id,role"
+            ).execute()
+
+    def sync_batch(
+        self, items: list[dict[str, Any]], content_type: str, include_credits: bool = False
+    ) -> dict[str, int]:
+        """Upsert a batch of raw TMDB items, including genre links and optionally
+        cast/crew (which costs one extra API call per item)."""
         succeeded = 0
         skipped = 0
         for item in items:
             content_id = self._upsert_content(item, content_type)
             if content_id:
                 self._link_genres(content_id, item.get("genre_ids", []))
+                if include_credits:
+                    try:
+                        self._link_cast_and_crew(content_id, str(item["id"]), content_type)
+                    except Exception:
+                        logger.exception("Failed to sync credits for content_id=%s", content_id)
                 succeeded += 1
             else:
                 skipped += 1

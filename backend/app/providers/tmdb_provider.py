@@ -2,6 +2,13 @@ import logging
 from typing import Any
 
 import httpx
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    before_sleep_log,
+)
 
 from app.core.config import settings
 from app.providers.base_provider import ContentProvider
@@ -19,8 +26,11 @@ class TMDBProvider(ContentProvider):
     - TMDB's `watch/providers` data is community-sourced and NOT contractually
       guaranteed to be accurate per region. We surface it as-is, always tagged
       with source="tmdb" and a timestamp, and never claim it as definitive.
-    - Free-tier TMDB has generous but non-infinite rate limits; we keep timeouts
-      short and let calling code (sync_tasks.py) handle retries/backoff.
+    - Free-tier TMDB has generous but non-infinite rate limits.
+    - Network-level connection resets (observed during development on some
+      networks/ISPs) are retried automatically up to 3 times with exponential
+      backoff via `_get`. Real API errors (401, 404, etc.) are NOT retried,
+      since retrying won't fix a bad request or invalid key.
     """
 
     def __init__(self) -> None:
@@ -33,16 +43,25 @@ class TMDBProvider(ContentProvider):
             timeout=10.0,
         )
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=8),
+        retry=retry_if_exception_type(httpx.RequestError),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        reraise=True,
+    )
     def _get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         try:
             response = self._client.get(path, params=params or {})
             response.raise_for_status()
             return response.json()
         except httpx.HTTPStatusError as exc:
+            # Real API error (4xx/5xx with a response) — do NOT retry, just log and raise.
             logger.error("TMDB API error on %s: %s", path, exc.response.text)
             raise
         except httpx.RequestError as exc:
-            logger.error("TMDB request failed on %s: %s", path, str(exc))
+            # Connection-level failure (reset, timeout, DNS, etc.) — eligible for retry.
+            logger.warning("TMDB request failed on %s (will retry if attempts remain): %s", path, str(exc))
             raise
 
     def fetch_trending(self, content_type: str = "movie", time_window: str = "week") -> list[dict[str, Any]]:
@@ -56,8 +75,6 @@ class TMDBProvider(ContentProvider):
 
     def fetch_upcoming(self, content_type: str = "movie") -> list[dict[str, Any]]:
         if content_type != "movie":
-            # TMDB doesn't have a dedicated "upcoming" endpoint for TV;
-            # airing_today is the closest equivalent.
             data = self._get("/tv/airing_today")
             return data.get("results", [])
         data = self._get("/movie/upcoming")
