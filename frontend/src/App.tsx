@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
+import { Navbar } from './components/common/Navbar'
 import { useAuth } from './contexts/AuthContext'
 
 function App() {
@@ -22,8 +23,11 @@ function App() {
         path="/"
         element={
           user ? (
-            <div className="min-h-screen bg-neutral-950 text-white flex items-center justify-center">
-              <h1 className="text-2xl">Logged in as {user.email} — home page coming next</h1>
+            <div className="min-h-screen bg-neutral-950 text-white">
+              <Navbar />
+              <div className="flex items-center justify-center py-20">
+                <h1 className="text-2xl">Logged in as {user.email} — home page coming next</h1>
+              </div>
             </div>
           ) : (
             <Navigate to="/login" />
