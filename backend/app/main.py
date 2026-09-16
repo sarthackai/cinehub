@@ -1,6 +1,9 @@
 import logging
 from contextlib import asynccontextmanager
 
+from app.api.routes import recommendations
+from app.ml.model_registry import get_model
+
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
@@ -42,7 +45,10 @@ async def lifespan(app: FastAPI):
     )
     scheduler.start()
     logger.info("Background scheduler started — full sync every 6 hours.")
-
+    # Fit the recommendation model once at startup (not per-request — expensive)
+    logger.info("Fitting recommendation model at startup...")
+    get_model()
+    logger.info("Recommendation model ready.")
     yield
 
     # Shutdown: stop the scheduler cleanly.
@@ -72,7 +78,7 @@ app.add_exception_handler(Exception, unhandled_exception_handler)
 app.include_router(auth.router)
 app.include_router(content.router)
 app.include_router(admin.router)
-
+app.include_router(recommendations.router)
 
 @app.get("/")
 def read_root():
