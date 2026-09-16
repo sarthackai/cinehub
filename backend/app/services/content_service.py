@@ -33,8 +33,8 @@ def _profile_url(path: str | None) -> str | None:
 
 
 class ContentSyncService:
-    def __init__(self) -> None:
-        self.provider = TMDBProvider()
+    def __init__(self, max_retries: int = 3) -> None:
+        self.provider = TMDBProvider(max_retries=max_retries)
         self.client = get_supabase_client()
         self._our_genre_cache: dict[str, int] | None = None
         self._tmdb_genre_id_to_name: dict[int, str] | None = None

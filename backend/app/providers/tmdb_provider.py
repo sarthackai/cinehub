@@ -28,12 +28,13 @@ class TMDBProvider(ContentProvider):
       with source="tmdb" and a timestamp, and never claim it as definitive.
     - Free-tier TMDB has generous but non-infinite rate limits.
     - Network-level connection resets (observed during development on some
-      networks/ISPs) are retried automatically up to 3 times with exponential
-      backoff via `_get`. Real API errors (401, 404, etc.) are NOT retried,
-      since retrying won't fix a bad request or invalid key.
+      networks/ISPs) are retried automatically via `_get`. Interactive/API-
+      triggered calls retry up to 3 times (fast feedback for a waiting user);
+      background/scheduled calls retry up to 5 times (more persistent, since
+      nothing is blocking on the response).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, max_retries: int = 3) -> None:
         self._client = httpx.Client(
             base_url=TMDB_BASE_URL,
             headers={
@@ -42,27 +43,29 @@ class TMDBProvider(ContentProvider):
             },
             timeout=10.0,
         )
+        self._max_retries = max_retries
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=8),
-        retry=retry_if_exception_type(httpx.RequestError),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
-        reraise=True,
-    )
     def _get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
-        try:
-            response = self._client.get(path, params=params or {})
-            response.raise_for_status()
-            return response.json()
-        except httpx.HTTPStatusError as exc:
-            # Real API error (4xx/5xx with a response) — do NOT retry, just log and raise.
-            logger.error("TMDB API error on %s: %s", path, exc.response.text)
-            raise
-        except httpx.RequestError as exc:
-            # Connection-level failure (reset, timeout, DNS, etc.) — eligible for retry.
-            logger.warning("TMDB request failed on %s (will retry if attempts remain): %s", path, str(exc))
-            raise
+        @retry(
+            stop=stop_after_attempt(self._max_retries),
+            wait=wait_exponential(multiplier=1, min=1, max=10),
+            retry=retry_if_exception_type(httpx.RequestError),
+            before_sleep=before_sleep_log(logger, logging.WARNING),
+            reraise=True,
+        )
+        def _do_get():
+            try:
+                response = self._client.get(path, params=params or {})
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as exc:
+                logger.error("TMDB API error on %s: %s", path, exc.response.text)
+                raise
+            except httpx.RequestError as exc:
+                logger.warning("TMDB request failed on %s (will retry if attempts remain): %s", path, str(exc))
+                raise
+
+        return _do_get()
 
     def fetch_trending(self, content_type: str = "movie", time_window: str = "week") -> list[dict[str, Any]]:
         data = self._get(f"/trending/{content_type}/{time_window}")

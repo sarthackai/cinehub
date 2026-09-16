@@ -1,12 +1,13 @@
 import logging
+from contextlib import asynccontextmanager
 
-from app.api.routes import admin
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from app.api.routes import content
-from app.api.routes import auth
+from apscheduler.schedulers.background import BackgroundScheduler
+
+from app.api.routes import auth, content, admin
 from app.core.config import settings
 from app.core.security import get_current_user_id
 from app.core.exceptions import (
@@ -14,16 +15,46 @@ from app.core.exceptions import (
     validation_exception_handler,
     unhandled_exception_handler,
 )
+from app.tasks.scheduled_sync import scheduled_full_sync
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 
+logger = logging.getLogger("streamsync")
+
+scheduler = BackgroundScheduler()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: schedule the recurring sync job.
+    # Every 6 hours is a reasonable default for a portfolio project — frequent
+    # enough to feel "live", infrequent enough to respect TMDB's rate limits.
+    scheduler.add_job(
+        scheduled_full_sync,
+        trigger="interval",
+        hours=6,
+        id="full_content_sync",
+        replace_existing=True,
+        next_run_time=None,  # don't run immediately on startup; first run is 6h out
+    )
+    scheduler.start()
+    logger.info("Background scheduler started — full sync every 6 hours.")
+
+    yield
+
+    # Shutdown: stop the scheduler cleanly.
+    scheduler.shutdown()
+    logger.info("Background scheduler stopped.")
+
+
 app = FastAPI(
     title="StreamSync AI Backend",
     docs_url="/docs" if settings.ENVIRONMENT == "development" else None,
     redoc_url="/redoc" if settings.ENVIRONMENT == "development" else None,
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -41,6 +72,7 @@ app.add_exception_handler(Exception, unhandled_exception_handler)
 app.include_router(auth.router)
 app.include_router(content.router)
 app.include_router(admin.router)
+
 
 @app.get("/")
 def read_root():
