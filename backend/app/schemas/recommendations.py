@@ -4,6 +4,7 @@ from pydantic import BaseModel
 class RecommendationItem(BaseModel):
     content_id: str
     title: str
+    poster_url: str | None = None
     final_score: float | None = None
     similarity_score: float | None = None
     explanation: str | None = None

@@ -29,6 +29,7 @@ export interface RecommendationItem {
     final_score?: number | null
     similarity_score?: number | null
     explanation?: string | null
+    poster_url?: string | null
 }
 
 export interface RecommendationResponse {

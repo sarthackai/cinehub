@@ -132,7 +132,7 @@ class SemanticRecommender:
                 {
                     "content_id": row["id"],
                     "title": row["title"],
-                    "overview": row["overview"],
+                    "poster_url": row.get("poster_url"),
                     "similarity_score": round(float(score), 4),
                 }
             )

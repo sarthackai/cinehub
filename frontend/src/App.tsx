@@ -1,16 +1,28 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
+import { Home } from './pages/Home'
 import { Navbar } from './components/common/Navbar'
 import { useAuth } from './contexts/AuthContext'
+
+function ProtectedLayout({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth()
+  if (!user) return <Navigate to="/login" />
+  return (
+    <div className="min-h-screen bg-base">
+      <Navbar />
+      {children}
+    </div>
+  )
+}
 
 function App() {
   const { user, isLoading } = useAuth()
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-neutral-950 flex items-center justify-center">
-        <p className="text-white">Loading...</p>
+      <div className="min-h-screen bg-base flex items-center justify-center">
+        <p className="text-text-primary">Loading...</p>
       </div>
     )
   }
@@ -22,16 +34,9 @@ function App() {
       <Route
         path="/"
         element={
-          user ? (
-            <div className="min-h-screen bg-neutral-950 text-white">
-              <Navbar />
-              <div className="flex items-center justify-center py-20">
-                <h1 className="text-2xl">Logged in as {user.email} — home page coming next</h1>
-              </div>
-            </div>
-          ) : (
-            <Navigate to="/login" />
-          )
+          <ProtectedLayout>
+            <Home />
+          </ProtectedLayout>
         }
       />
     </Routes>

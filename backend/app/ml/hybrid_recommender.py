@@ -169,6 +169,7 @@ class HybridRecommender:
                 {
                     "content_id": row["id"],
                     "title": row["title"],
+                    "poster_url": row.get("poster_url"),
                     "final_score": round(float(final_scores[idx]), 4),
                     "explanation": self._explain(
                         row,

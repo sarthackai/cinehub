@@ -78,6 +78,7 @@ class ContentBasedRecommender:
                 {
                     "content_id": row["id"],
                     "title": row["title"],
+                    "poster_url": row.get("poster_url"),
                     "similarity_score": round(float(score), 4),
                 }
             )
