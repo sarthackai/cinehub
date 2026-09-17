@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import type { ContentItem, RecommendationItem } from '../../types'
 
 interface ContentCardProps {
@@ -6,11 +7,19 @@ interface ContentCardProps {
 }
 
 export function ContentCard({ item, posterUrl }: ContentCardProps) {
+    const navigate = useNavigate()
     const title = item.title
     const explanation = 'explanation' in item ? item.explanation : undefined
+    const contentId = 'content_id' in item ? item.content_id : undefined
+
+    const handleClick = () => {
+        if (contentId) {
+            navigate(`/content/${contentId}`)
+        }
+    }
 
     return (
-        <div className="group flex-shrink-0 w-44 cursor-pointer">
+        <div className="group flex-shrink-0 w-44 cursor-pointer" onClick={handleClick}>
             <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-surface transition-transform duration-200 group-hover:scale-[1.03]">
                 {posterUrl ? (
                     <img

@@ -43,3 +43,34 @@ export interface ApiError {
     path?: string
     details?: unknown
 }
+
+export interface CastMember {
+    name: string
+    character?: string | null
+    profile_image_url?: string | null
+}
+
+export interface CrewMember {
+    name: string
+    role: string
+}
+
+export interface ContentDetails {
+    id: string
+    title: string
+    original_title?: string | null
+    overview?: string | null
+    poster_url?: string | null
+    backdrop_url?: string | null
+    release_date?: string | null
+    language?: string | null
+    runtime_minutes?: number | null
+    number_of_seasons?: number | null
+    number_of_episodes?: number | null
+    provider_rating?: number | null
+    provider_vote_count?: number | null
+    popularity?: number | null
+    genres: string[]
+    cast: CastMember[]
+    crew: CrewMember[]
+}
