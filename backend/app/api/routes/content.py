@@ -84,3 +84,39 @@ def get_content_details(content_id: str):
         "cast": cast,
         "crew": crew,
     }
+
+@router.get("/search/keyword")
+def keyword_search(q: str, limit: int = 20):
+    """
+    Fast keyword search against titles in our database (not TMDB live).
+    Case-insensitive partial match. This is the 'exact search results' part
+    of the spec — for meaning-based search, see /api/recommendations/semantic-search.
+    """
+    from app.database.supabase_client import get_supabase_client
+
+    if not q or not q.strip():
+        return {"count": 0, "results": []}
+
+    client = get_supabase_client()
+    result = (
+        client.table("content")
+        .select("id, title, overview, poster_url, release_date, provider_rating, content_type")
+        .ilike("title", f"%{q.strip()}%")
+        .limit(limit)
+        .execute()
+    )
+
+    return {
+        "count": len(result.data),
+        "results": [
+            {
+                "content_id": row["id"],
+                "title": row["title"],
+                "overview": row.get("overview"),
+                "poster_url": row.get("poster_url"),
+                "release_date": row.get("release_date"),
+                "rating": row.get("provider_rating"),
+            }
+            for row in result.data
+        ],
+    }

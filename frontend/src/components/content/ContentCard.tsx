@@ -19,7 +19,7 @@ export function ContentCard({ item, posterUrl }: ContentCardProps) {
     }
 
     return (
-        <div className="group flex-shrink-0 w-44 cursor-pointer" onClick={handleClick}>
+        <div className="group flex-shrink-0 w-44 cursor-pointer snap-start" onClick={handleClick}>
             <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-surface transition-transform duration-200 group-hover:scale-[1.03]">
                 {posterUrl ? (
                     <img
