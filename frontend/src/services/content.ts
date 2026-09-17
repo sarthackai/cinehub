@@ -36,3 +36,11 @@ export async function getSimilarContent(contentId: string, topN = 10) {
     })
     return response.data.results
 }
+
+export async function keywordSearch(query: string) {
+    const response = await api.get<{ count: number; results: ContentItem[] }>(
+        '/api/content/search/keyword',
+        { params: { q: query } }
+    )
+    return response.data.results
+}

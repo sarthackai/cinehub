@@ -5,6 +5,7 @@ import { Home } from './pages/Home'
 import { Navbar } from './components/common/Navbar'
 import { useAuth } from './contexts/AuthContext'
 import { ContentDetails } from './pages/ContentDetails'
+import { Search } from './pages/Search'
 
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
@@ -45,6 +46,14 @@ function App() {
         element={
           <ProtectedLayout>
             <ContentDetails />
+          </ProtectedLayout>
+        }
+      />
+      <Route
+        path="/search"
+        element={
+          <ProtectedLayout>
+            <Search />
           </ProtectedLayout>
         }
       />

@@ -58,10 +58,11 @@ def semantic_search(payload: SemanticSearchRequest):
         {
             "content_id": r["content_id"],
             "title": r["title"],
+            "poster_url": r.get("poster_url"),
             "similarity_score": r["similarity_score"],
         }
         for r in raw_results
-    ]
+    ] 
     return RecommendationResponse(
         count=len(results),
         results=[RecommendationItem(**r) for r in results],
