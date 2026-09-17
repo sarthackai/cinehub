@@ -16,12 +16,12 @@ export function ContentCarousel({ title, items, getPosterUrl, isLoading }: Conte
     return (
         <section className="mb-10">
             <h2 className="text-xl font-semibold text-text-primary mb-4 px-6">{title}</h2>
-            <div className="flex gap-4 overflow-x-auto px-6 pb-2 scrollbar-hide">
+            <div className="flex gap-4 overflow-x-auto px-6 pb-4 snap-x snap-mandatory scroll-pl-6 carousel-scroll">
                 {isLoading
                     ? Array.from({ length: 6 }).map((_, i) => (
                         <div
                             key={i}
-                            className="flex-shrink-0 w-44 aspect-[2/3] rounded-lg bg-surface animate-pulse"
+                            className="flex-shrink-0 w-44 aspect-[2/3] rounded-lg bg-surface animate-pulse snap-start"
                         />
                     ))
                     : items.map((item, i) => (
