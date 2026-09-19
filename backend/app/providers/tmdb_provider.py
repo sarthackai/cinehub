@@ -13,7 +13,7 @@ from tenacity import (
 from app.core.config import settings
 from app.providers.base_provider import ContentProvider
 
-logger = logging.getLogger("streamsync")
+logger = logging.getLogger("cinehub")
 
 TMDB_BASE_URL = "https://api.themoviedb.org/3"
 

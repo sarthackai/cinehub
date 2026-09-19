@@ -10,7 +10,7 @@ import threading
 
 from app.ml.hybrid_recommender import HybridRecommender
 
-logger = logging.getLogger("streamsync")
+logger = logging.getLogger("cinehub")
 
 _model: HybridRecommender | None = None
 _lock = threading.Lock()

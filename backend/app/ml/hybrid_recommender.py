@@ -21,7 +21,7 @@ from app.ml.content_model import ContentBasedRecommender
 from app.ml.semantic_model import SemanticRecommender
 from app.ml.personalization import build_preference_vector, get_user_signal_weights
 
-logger = logging.getLogger("streamsync")
+logger = logging.getLogger("cinehub")
 
 # Configurable hybrid weights — must sum to 1.0 for scores to stay in [0, 1]
 WEIGHTS = {

@@ -27,7 +27,7 @@ from app.core.config import settings
 from app.database.supabase_client import get_supabase_client
 from app.ml.preprocessing import load_and_preprocess_content
 
-logger = logging.getLogger("streamsync")
+logger = logging.getLogger("cinehub")
 
 
 class SemanticRecommender:

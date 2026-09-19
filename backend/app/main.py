@@ -26,7 +26,7 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 
-logger = logging.getLogger("streamsync")
+logger = logging.getLogger("cinehub")
 
 scheduler = BackgroundScheduler()
 
@@ -58,7 +58,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="StreamSync AI Backend",
+    title="CineHub Backend",
     docs_url="/docs" if settings.ENVIRONMENT == "development" else None,
     redoc_url="/redoc" if settings.ENVIRONMENT == "development" else None,
     lifespan=lifespan,
@@ -85,7 +85,7 @@ app.include_router(user.router)
 
 @app.get("/")
 def read_root():
-    return {"status": "ok", "message": "StreamSync AI backend is running"}
+    return {"status": "ok", "message": "CineHub backend is running"}
 
 
 @app.get("/health")

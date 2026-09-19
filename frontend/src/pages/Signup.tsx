@@ -30,7 +30,9 @@ export function Signup() {
     return (
         <div className="min-h-screen bg-neutral-950 flex items-center justify-center px-4">
             <div className="w-full max-w-md">
-                <h1 className="text-3xl font-bold text-white mb-2 text-center">StreamSync AI</h1>
+                <h1 className="text-3xl font-bold text-white mb-2 text-center">
+                    Cine<span className="text-accent">Hub</span>
+                </h1>
                 <p className="text-neutral-400 text-center mb-8">Create your account</p>
 
                 <form

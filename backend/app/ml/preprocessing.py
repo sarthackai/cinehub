@@ -19,7 +19,7 @@ import pandas as pd
 
 from app.database.supabase_client import get_supabase_client
 
-logger = logging.getLogger("streamsync")
+logger = logging.getLogger("cinehub")
 
 MAX_CAST_IN_SOUP = 5  # top-billed cast only, to keep the text soup focused
 

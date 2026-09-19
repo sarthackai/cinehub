@@ -11,7 +11,7 @@ import logging
 from app.services.content_service import ContentSyncService
 from app.ml.model_registry import refit_model
 
-logger = logging.getLogger("streamsync")
+logger = logging.getLogger("cinehub")
 
 
 def scheduled_full_sync() -> None:

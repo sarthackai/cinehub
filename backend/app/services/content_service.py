@@ -10,7 +10,7 @@ from typing import Any
 from app.database.supabase_client import get_supabase_client
 from app.providers.tmdb_provider import TMDBProvider
 
-logger = logging.getLogger("streamsync")
+logger = logging.getLogger("cinehub")
 
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w780"
 TMDB_BACKDROP_BASE = "https://image.tmdb.org/t/p/w1280"

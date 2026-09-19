@@ -14,7 +14,7 @@ export function Navbar() {
         <nav className="sticky top-0 z-50 bg-neutral-950/95 backdrop-blur border-b border-neutral-900">
             <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
                 <Link to="/" className="text-xl font-bold text-white tracking-tight">
-                    Stream<span className="text-red-600">Sync</span> AI
+                    Cine<span className="text-accent">Hub</span>
                 </Link>
 
                 <div className="flex items-center gap-6">

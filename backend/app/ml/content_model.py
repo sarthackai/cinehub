@@ -20,7 +20,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from app.ml.preprocessing import load_and_preprocess_content
 
-logger = logging.getLogger("streamsync")
+logger = logging.getLogger("cinehub")
 
 
 class ContentBasedRecommender:

@@ -24,7 +24,7 @@ import numpy as np
 
 from app.database.supabase_client import get_supabase_client
 
-logger = logging.getLogger("streamsync")
+logger = logging.getLogger("cinehub")
 
 RATING_WEIGHTS = {5.0: 1.0, 4.5: 0.85, 4.0: 0.7, 3.5: 0.5, 3.0: 0.3}
 DEFAULT_RATING_WEIGHT = 0.2
