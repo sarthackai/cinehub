@@ -8,6 +8,8 @@ import { ContentDetails } from './pages/ContentDetails'
 import { Search } from './pages/Search'
 import { Dashboard } from './pages/Dashboard'
 import { Browse } from './pages/Browse'
+import { Admin } from './pages/Admin'
+
 
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
@@ -72,6 +74,14 @@ function App() {
         element={
           <ProtectedLayout>
             <Dashboard />
+          </ProtectedLayout>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedLayout>
+            <Admin />
           </ProtectedLayout>
         }
       />

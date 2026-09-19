@@ -87,3 +87,25 @@ export interface DashboardData {
     favorite_genres: { genre: string; count: number }[]
     average_rating_given: number | null
 }
+
+export interface SyncLogEntry {
+    job_name: string
+    provider: string
+    status: string
+    rows_processed: number
+    error_message: string | null
+    started_at: string
+    finished_at: string | null
+}
+
+export interface AdminAnalytics {
+    totals: {
+        content: number
+        movies: number
+        tv_shows: number
+        users: number
+    }
+    recent_syncs: SyncLogEntry[]
+    popular_searches: { query: string; count: number }[]
+    most_favorited: { content_id: string; title: string; poster_url: string | null; favorite_count: number }[]
+}

@@ -21,18 +21,27 @@ export function Navbar() {
                     <Link to="/" className="text-sm text-neutral-300 hover:text-white transition">
                         Home
                     </Link>
-                    <Link to="/search" className="text-sm text-neutral-300 hover:text-white transition">
-                        Search
-                    </Link>
                     <Link to="/browse/movie" className="text-sm text-neutral-300 hover:text-white transition">
                         Movies
                     </Link>
                     <Link to="/browse/tv" className="text-sm text-neutral-300 hover:text-white transition">
                         TV Shows
                     </Link>
+                    <Link to="/search" className="text-sm text-neutral-300 hover:text-white transition">
+                        Search
+                    </Link>
                     <Link to="/dashboard" className="text-sm text-neutral-300 hover:text-white transition">
                         My List
                     </Link>
+
+                    {user?.is_admin && (
+                        <Link
+                            to="/admin"
+                            className="text-sm text-accent hover:text-accent-hover transition font-medium"
+                        >
+                            Admin
+                        </Link>
+                    )}
 
                     {user && (
                         <div className="flex items-center gap-4 pl-4 border-l border-neutral-800">
