@@ -134,7 +134,7 @@ class HybridRecommender:
         # Trending: we don't have a separate stored trending_score column populated
         # yet (Phase 2 schema has the column; Phase 6 sync doesn't set it) — using
         # popularity as a documented proxy for now rather than fabricating a metric.
-        trending_raw = popularity_raw.copy()
+        trending_raw = df["trending_score"].fillna(0).to_numpy(dtype=float)
 
         content_sim_norm = _normalize(content_sim_scores)
         semantic_sim_norm = _normalize(semantic_sim_scores)

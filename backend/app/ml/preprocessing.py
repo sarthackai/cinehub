@@ -39,7 +39,7 @@ def _fetch_content_dataframe() -> pd.DataFrame:
 
     content_result = client.table("content").select(
         "id, external_id, content_type, title, overview, language, "
-        "release_date, provider_rating, provider_vote_count, popularity, poster_url"
+        "release_date, provider_rating, provider_vote_count, popularity, poster_url, trending_score"
     ).execute()
     content_df = pd.DataFrame(content_result.data)
 

@@ -268,9 +268,97 @@ class ContentSyncService:
         total_succeeded = sum(r["rows_processed"] for r in results)
         total_failed = sum(1 for r in results if r["status"] == "failed")
 
+        self.recompute_trending_scores()
+
         return {
             "jobs_run": len(results),
             "total_rows_processed": total_succeeded,
             "jobs_failed": total_failed,
             "details": results,
-     }       
+        }
+
+    def recompute_trending_scores(self) -> dict[str, int]:
+        """
+        Recomputes and stores a real trending_score for every content item,
+        combining multiple genuine signals (not just a popularity re-label):
+
+            trending_score = 0.35 * normalized_popularity
+                            + 0.20 * normalized_rating
+                            + 0.15 * normalized_vote_count
+                            + 0.15 * normalized_recency
+                            + 0.15 * normalized_recent_activity
+
+        recent_activity = count of user_interactions (likes/views/clicks) on
+        this item in the last 7 days — a real, app-level signal, distinct from
+        anything TMDB provides. With a small user base this signal will often
+        be 0, which is honest: trending should reflect real usage, and we
+        don't fabricate activity that didn't happen.
+
+        Weights are configurable constants below (not hardcoded inline).
+        """
+        import numpy as np
+        from datetime import datetime, timedelta, timezone
+
+        WEIGHTS = {
+            "popularity": 0.35,
+            "rating": 0.20,
+            "vote_count": 0.15,
+            "recency": 0.15,
+            "recent_activity": 0.15,
+        }
+
+        content_result = self.client.table("content").select(
+            "id, popularity, provider_rating, provider_vote_count, release_date"
+        ).execute()
+        rows = content_result.data
+        if not rows:
+            return {"updated": 0}
+
+        seven_days_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        interactions = (
+            self.client.table("user_interactions")
+            .select("content_id")
+            .gte("created_at", seven_days_ago)
+            .execute()
+        )
+        activity_counts: dict[str, int] = {}
+        for row in interactions.data:
+            activity_counts[row["content_id"]] = activity_counts.get(row["content_id"], 0) + 1
+
+        def _normalize(values: list[float]) -> list[float]:
+            arr = np.array(values, dtype=float)
+            if arr.max() == arr.min():
+                return [0.0] * len(arr)
+            return ((arr - arr.min()) / (arr.max() - arr.min())).tolist()
+
+        def _recency(release_date_str: str | None) -> float:
+            if not release_date_str:
+                return 0.0
+            try:
+                release = datetime.strptime(release_date_str, "%Y-%m-%d").date()
+            except ValueError:
+                return 0.0
+            days_old = max(0, (datetime.now(timezone.utc).date() - release).days)
+            return max(0.0, 1.0 - (days_old / 365))  # full score at release, ~0 by 1 year
+
+        popularity_norm = _normalize([r.get("popularity") or 0 for r in rows])
+        rating_norm = _normalize([r.get("provider_rating") or 0 for r in rows])
+        vote_count_norm = _normalize([r.get("provider_vote_count") or 0 for r in rows])
+        recency_scores = [_recency(r.get("release_date")) for r in rows]
+        activity_norm = _normalize([activity_counts.get(r["id"], 0) for r in rows])
+
+        updated = 0
+        for i, row in enumerate(rows):
+            score = (
+                WEIGHTS["popularity"] * popularity_norm[i]
+                + WEIGHTS["rating"] * rating_norm[i]
+                + WEIGHTS["vote_count"] * vote_count_norm[i]
+                + WEIGHTS["recency"] * recency_scores[i]
+                + WEIGHTS["recent_activity"] * activity_norm[i]
+            )
+            self.client.table("content").update({"trending_score": round(float(score), 4)}).eq(
+                "id", row["id"]
+            ).execute()
+            updated += 1
+
+        return {"updated": updated}     
