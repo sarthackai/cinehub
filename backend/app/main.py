@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from app.api.routes import recommendations
 from app.ml.model_registry import get_model
-
+from app.api.routes import interactions
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
@@ -79,6 +79,7 @@ app.include_router(auth.router)
 app.include_router(content.router)
 app.include_router(admin.router)
 app.include_router(recommendations.router)
+app.include_router(interactions.router)
 
 @app.get("/")
 def read_root():
