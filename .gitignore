@@ -16,3 +16,4 @@ ml_pipeline/artifacts/
 # OS
 .DS_Store
 Thumbs.db
+backend/.coverage
