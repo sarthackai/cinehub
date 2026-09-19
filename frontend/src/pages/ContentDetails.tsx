@@ -1,7 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getContentDetails, getSimilarContent } from '../services/content'
+import {
+    addFavorite,
+    removeFavorite,
+    listFavorites,
+    addToWatchlist,
+    removeFromWatchlist,
+    listWatchlist,
+    rateContent,
+    removeRating,
+    listRatings,
+} from '../services/interactions'
 import { ContentCarousel } from '../components/content/ContentCarousel'
+import { Button } from '../components/ui/Button'
 import type { ContentDetails as ContentDetailsType, RecommendationItem } from '../types'
 
 export function ContentDetails() {
@@ -11,6 +23,11 @@ export function ContentDetails() {
     const [similar, setSimilar] = useState<RecommendationItem[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [isLoadingSimilar, setIsLoadingSimilar] = useState(true)
+
+    const [isFavorite, setIsFavorite] = useState(false)
+    const [isInWatchlist, setIsInWatchlist] = useState(false)
+    const [userRating, setUserRating] = useState<number | null>(null)
+    const [actionLoading, setActionLoading] = useState(false)
 
     useEffect(() => {
         if (!id) return
@@ -23,7 +40,65 @@ export function ContentDetails() {
             .then(setSimilar)
             .catch((err) => console.error('Failed to load similar content:', err))
             .finally(() => setIsLoadingSimilar(false))
+
+        listFavorites().then((favs) => setIsFavorite(favs.some((f) => f.content_id === id)))
+        listWatchlist().then((wl) => setIsInWatchlist(wl.some((w) => w.content_id === id)))
+        listRatings().then((ratings) => {
+            const existing = ratings.find((r) => r.content_id === id)
+            setUserRating(existing ? existing.rating : null)
+        })
     }, [id])
+
+    const toggleFavorite = async () => {
+        if (!id) return
+        setActionLoading(true)
+        try {
+            if (isFavorite) {
+                await removeFavorite(id)
+                setIsFavorite(false)
+            } else {
+                await addFavorite(id)
+                setIsFavorite(true)
+            }
+        } catch (err) {
+            console.error('Failed to toggle favorite:', err)
+        } finally {
+            setActionLoading(false)
+        }
+    }
+
+    const toggleWatchlist = async () => {
+        if (!id) return
+        setActionLoading(true)
+        try {
+            if (isInWatchlist) {
+                await removeFromWatchlist(id)
+                setIsInWatchlist(false)
+            } else {
+                await addToWatchlist(id)
+                setIsInWatchlist(true)
+            }
+        } catch (err) {
+            console.error('Failed to toggle watchlist:', err)
+        } finally {
+            setActionLoading(false)
+        }
+    }
+
+    const handleRate = async (rating: number) => {
+        if (!id) return
+        try {
+            if (userRating === rating) {
+                await removeRating(id)
+                setUserRating(null)
+            } else {
+                await rateContent(id, rating)
+                setUserRating(rating)
+            }
+        } catch (err) {
+            console.error('Failed to rate:', err)
+        }
+    }
 
     if (isLoading) {
         return (
@@ -45,7 +120,6 @@ export function ContentDetails() {
 
     return (
         <div className="min-h-screen bg-base">
-            {/* Backdrop hero */}
             <div className="relative w-full h-[60vh] overflow-hidden">
                 {details.backdrop_url && (
                     <img
@@ -63,7 +137,6 @@ export function ContentDetails() {
                 </button>
             </div>
 
-            {/* Content info, overlapping the backdrop */}
             <div className="max-w-5xl mx-auto px-6 -mt-32 relative z-10">
                 <div className="flex gap-6 items-end mb-6">
                     {details.poster_url && (
@@ -93,6 +166,37 @@ export function ContentDetails() {
                     </div>
                 </div>
 
+                <div className="flex items-center gap-3 mb-8 flex-wrap">
+                    <Button
+                        variant={isFavorite ? 'primary' : 'secondary'}
+                        onClick={toggleFavorite}
+                        disabled={actionLoading}
+                    >
+                        {isFavorite ? '♥ Favorited' : '♡ Add to Favorites'}
+                    </Button>
+                    <Button
+                        variant={isInWatchlist ? 'primary' : 'secondary'}
+                        onClick={toggleWatchlist}
+                        disabled={actionLoading}
+                    >
+                        {isInWatchlist ? '✓ In My List' : '+ Add to My List'}
+                    </Button>
+
+                    <div className="flex items-center gap-1 ml-2">
+                        <span className="text-text-muted text-sm mr-2">Your rating:</span>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                                key={star}
+                                onClick={() => handleRate(star)}
+                                className={`text-2xl transition ${userRating && star <= userRating ? 'text-accent' : 'text-neutral-700'
+                                    } hover:text-accent-hover`}
+                            >
+                                ★
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
                 {details.overview && (
                     <p className="text-text-secondary leading-relaxed max-w-3xl mb-8">{details.overview}</p>
                 )}
@@ -100,7 +204,7 @@ export function ContentDetails() {
                 {details.cast.length > 0 && (
                     <div className="mb-10">
                         <h2 className="text-xl font-semibold text-text-primary mb-4">Cast</h2>
-                        <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                        <div className="flex gap-4 overflow-x-auto pb-2 carousel-scroll">
                             {details.cast.map((member, i) => (
                                 <div key={i} className="flex-shrink-0 w-24 text-center">
                                     <div className="w-24 h-24 rounded-full overflow-hidden bg-surface mb-2">

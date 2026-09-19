@@ -108,9 +108,17 @@ def rate_content(payload: RatingRequest, user_id: str = Depends(get_current_user
         )
     client = get_supabase_client()
     client.table("ratings").upsert(
-        {"user_id": user_id, "content_id": payload.content_id, "rating": payload.rating}
+        {"user_id": user_id, "content_id": payload.content_id, "rating": payload.rating},
+        on_conflict="user_id,content_id",
     ).execute()
     return {"status": "rated", "rating": payload.rating}
+
+
+@router.delete("/ratings/{content_id}")
+def remove_rating(content_id: str, user_id: str = Depends(get_current_user_id)):
+    client = get_supabase_client()
+    client.table("ratings").delete().eq("user_id", user_id).eq("content_id", content_id).execute()
+    return {"status": "removed"}
 
 
 @router.get("/ratings")
