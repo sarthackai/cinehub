@@ -6,6 +6,7 @@ import { Navbar } from './components/common/Navbar'
 import { useAuth } from './contexts/AuthContext'
 import { ContentDetails } from './pages/ContentDetails'
 import { Search } from './pages/Search'
+import { Dashboard } from './pages/Dashboard'
 
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
@@ -54,6 +55,14 @@ function App() {
         element={
           <ProtectedLayout>
             <Search />
+          </ProtectedLayout>
+        }
+      />
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedLayout>
+            <Dashboard />
           </ProtectedLayout>
         }
       />

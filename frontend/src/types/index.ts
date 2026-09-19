@@ -74,3 +74,15 @@ export interface ContentDetails {
     cast: CastMember[]
     crew: CrewMember[]
 }
+
+export interface DashboardData {
+    totals: {
+        watched: number
+        rated: number
+        favorites: number
+        watchlist: number
+        searches: number
+    }
+    favorite_genres: { genre: string; count: number }[]
+    average_rating_given: number | null
+}
