@@ -95,4 +95,9 @@ def health_check():
 
 @app.get("/api/auth/me")
 def get_me(user_id: str = Depends(get_current_user_id)):
-    return {"user_id": user_id}
+    from app.database.supabase_client import get_supabase_client
+
+    client = get_supabase_client()
+    profile = client.table("profiles").select("is_admin").eq("id", user_id).execute()
+    is_admin = bool(profile.data and profile.data[0].get("is_admin"))
+    return {"user_id": user_id, "is_admin": is_admin}
