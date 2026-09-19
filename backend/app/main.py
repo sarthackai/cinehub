@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from apscheduler.schedulers.background import BackgroundScheduler
+from app.api.routes import user
 
 from app.api.routes import auth, content, admin
 from app.core.config import settings
@@ -80,6 +81,7 @@ app.include_router(content.router)
 app.include_router(admin.router)
 app.include_router(recommendations.router)
 app.include_router(interactions.router)
+app.include_router(user.router)
 
 @app.get("/")
 def read_root():
