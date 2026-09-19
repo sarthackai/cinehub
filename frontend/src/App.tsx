@@ -7,6 +7,7 @@ import { useAuth } from './contexts/AuthContext'
 import { ContentDetails } from './pages/ContentDetails'
 import { Search } from './pages/Search'
 import { Dashboard } from './pages/Dashboard'
+import { Browse } from './pages/Browse'
 
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
@@ -55,6 +56,14 @@ function App() {
         element={
           <ProtectedLayout>
             <Search />
+          </ProtectedLayout>
+        }
+      />
+      <Route
+        path="/browse/:type"
+        element={
+          <ProtectedLayout>
+            <Browse />
           </ProtectedLayout>
         }
       />

@@ -44,3 +44,11 @@ export async function keywordSearch(query: string) {
     )
     return response.data.results
 }
+
+export async function browseContent(contentType: 'movie' | 'tv') {
+    const response = await api.get<{ count: number; results: ContentItem[] }>(
+        '/api/content/browse',
+        { params: { content_type: contentType, limit: 50 } }
+    )
+    return response.data.results
+}

@@ -34,6 +34,79 @@ def get_trending(content_type: str = "movie", time_window: str = "week"):
 
     return {"count": len(simplified), "results": simplified}
 
+@router.get("/search/keyword")
+def keyword_search(q: str, limit: int = 20):
+    """
+    Fast keyword search against titles in our database (not TMDB live).
+    Case-insensitive partial match. This is the 'exact search results' part
+    of the spec — for meaning-based search, see /api/recommendations/semantic-search.
+    """
+    from app.database.supabase_client import get_supabase_client
+
+    if not q or not q.strip():
+        return {"count": 0, "results": []}
+
+    client = get_supabase_client()
+    result = (
+        client.table("content")
+        .select("id, title, overview, poster_url, release_date, provider_rating, content_type")
+        .ilike("title", f"%{q.strip()}%")
+        .limit(limit)
+        .execute()
+    )
+
+    return {
+        "count": len(result.data),
+        "results": [
+            {
+                "content_id": row["id"],
+                "title": row["title"],
+                "overview": row.get("overview"),
+                "poster_url": row.get("poster_url"),
+                "release_date": row.get("release_date"),
+                "rating": row.get("provider_rating"),
+            }
+            for row in result.data
+        ],
+    }
+
+@router.get("/browse")
+def browse_content(content_type: str = "movie", limit: int = 50, offset: int = 0):
+    """
+    Returns all content of a given type from our database, sorted by
+    popularity. Used for the Movies / TV Shows browse tabs.
+    """
+    from app.database.supabase_client import get_supabase_client
+
+    if content_type not in ("movie", "tv"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="content_type must be 'movie' or 'tv'",
+        )
+
+    client = get_supabase_client()
+    result = (
+        client.table("content")
+        .select("id, title, poster_url, release_date, provider_rating, content_type")
+        .eq("content_type", content_type)
+        .order("popularity", desc=True)
+        .range(offset, offset + limit - 1)
+        .execute()
+    )
+
+    return {
+        "count": len(result.data),
+        "results": [
+            {
+                "content_id": row["id"],
+                "title": row["title"],
+                "poster_url": row.get("poster_url"),
+                "release_date": row.get("release_date"),
+                "rating": row.get("provider_rating"),
+            }
+            for row in result.data
+        ],
+    }
 @router.get("/{content_id}")
 def get_content_details(content_id: str):
     from app.database.supabase_client import get_supabase_client
@@ -83,40 +156,4 @@ def get_content_details(content_id: str):
         "genres": genres,
         "cast": cast,
         "crew": crew,
-    }
-
-@router.get("/search/keyword")
-def keyword_search(q: str, limit: int = 20):
-    """
-    Fast keyword search against titles in our database (not TMDB live).
-    Case-insensitive partial match. This is the 'exact search results' part
-    of the spec — for meaning-based search, see /api/recommendations/semantic-search.
-    """
-    from app.database.supabase_client import get_supabase_client
-
-    if not q or not q.strip():
-        return {"count": 0, "results": []}
-
-    client = get_supabase_client()
-    result = (
-        client.table("content")
-        .select("id, title, overview, poster_url, release_date, provider_rating, content_type")
-        .ilike("title", f"%{q.strip()}%")
-        .limit(limit)
-        .execute()
-    )
-
-    return {
-        "count": len(result.data),
-        "results": [
-            {
-                "content_id": row["id"],
-                "title": row["title"],
-                "overview": row.get("overview"),
-                "poster_url": row.get("poster_url"),
-                "release_date": row.get("release_date"),
-                "rating": row.get("provider_rating"),
-            }
-            for row in result.data
-        ],
     }

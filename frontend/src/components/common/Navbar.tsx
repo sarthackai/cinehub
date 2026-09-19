@@ -24,6 +24,12 @@ export function Navbar() {
                     <Link to="/search" className="text-sm text-neutral-300 hover:text-white transition">
                         Search
                     </Link>
+                    <Link to="/browse/movie" className="text-sm text-neutral-300 hover:text-white transition">
+                        Movies
+                    </Link>
+                    <Link to="/browse/tv" className="text-sm text-neutral-300 hover:text-white transition">
+                        TV Shows
+                    </Link>
                     <Link to="/dashboard" className="text-sm text-neutral-300 hover:text-white transition">
                         My List
                     </Link>
