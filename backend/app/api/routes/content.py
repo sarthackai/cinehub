@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.core.security import get_current_user_id
 from app.providers.tmdb_provider import TMDBProvider
 
 router = APIRouter(prefix="/api/content", tags=["content"])
@@ -16,7 +17,6 @@ def get_trending(content_type: str = "movie", time_window: str = "week"):
             detail="Failed to fetch trending content from metadata provider.",
         )
 
-    # Return a trimmed, frontend-friendly shape for now — full DB storage comes in Step 7.
     simplified = [
         {
             "external_id": item.get("id"),
@@ -32,10 +32,10 @@ def get_trending(content_type: str = "movie", time_window: str = "week"):
         for item in results
     ]
 
-    return {"count": len(simplified), "results": simplified}
+    return {"count":len(simplified), "results": simplified}
 
 @router.get("/search/keyword")
-def keyword_search(q: str, limit: int = 20):
+def keyword_search(q: str, limit: int = 20, user_id: str = Depends(get_current_user_id)):
     """
     Fast keyword search against titles in our database (not TMDB live).
     Case-insensitive partial match. This is the 'exact search results' part
@@ -45,8 +45,12 @@ def keyword_search(q: str, limit: int = 20):
 
     if not q or not q.strip():
         return {"count": 0, "results": []}
-
+    
     client = get_supabase_client()
+
+    # Log search history
+    client.table("search_history").insert({"user_id": user_id, "query": q.strip()}).execute()
+
     result = (
         client.table("content")
         .select("id, title, overview, poster_url, release_date, provider_rating, content_type")
@@ -107,6 +111,7 @@ def browse_content(content_type: str = "movie", limit: int = 50, offset: int = 0
             for row in result.data
         ],
     }
+
 @router.get("/{content_id}")
 def get_content_details(content_id: str):
     from app.database.supabase_client import get_supabase_client
