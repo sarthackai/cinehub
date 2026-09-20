@@ -1,26 +1,29 @@
 """
-Semantic recommendation model using Sentence Transformers to generate dense
-embeddings for each content item, enabling meaning-based similarity search
-that goes beyond keyword overlap (e.g. "space exploration and time travel"
-matching "astronauts exploring the universe").
+Semantic recommendation model using fastembed (ONNX-based, lightweight) to
+generate dense embeddings for each content item, enabling meaning-based
+similarity search that goes beyond keyword overlap (e.g. "space exploration
+and time travel" matching "astronauts exploring the universe").
 
 Design notes:
-- We embed the overview text specifically (not the full "soup"), since
-  Sentence Transformers are trained on natural language sentences, and
-  feeding it a keyword-stuffed soup would work against its strengths.
-  Genre/cast context is still available separately via ContentBasedRecommender
-  and gets combined at the hybrid-ranking layer (Phase 10).
-- Embeddings are also persisted into Supabase's content_embeddings table
-  (Phase 2 schema) so they don't need to be recomputed from scratch on every
-  server restart — though we still keep an in-memory copy for fast similarity
-  search within a running process.
+- We use fastembed instead of sentence-transformers/torch specifically for
+  deployment-memory reasons: torch's baseline import footprint alone exceeds
+  typical free-tier hosting memory limits (512MB), while fastembed runs a
+  comparable-quality small embedding model via ONNX Runtime with a much
+  lighter memory footprint. This is a deliberate, documented substitution,
+  not an accidental downgrade — see BAAI/bge-small-en-v1.5's public MTEB
+  benchmark results for comparison against sentence-transformers models.
+- We embed the overview text specifically (not the full "soup"), consistent
+  with the original design — natural sentences work better for embedding
+  models than keyword-stuffed text.
+- Embeddings are persisted into Supabase's content_embeddings table so they
+  don't need to be recomputed from scratch on every server restart.
 """
 
 import logging
 
 import numpy as np
 import pandas as pd
-from sentence_transformers import SentenceTransformer
+from fastembed import TextEmbedding
 from sklearn.metrics.pairwise import cosine_similarity
 
 from app.core.config import settings
@@ -29,10 +32,12 @@ from app.ml.preprocessing import load_and_preprocess_content
 
 logger = logging.getLogger("cinehub")
 
+FASTEMBED_MODEL_NAME = "BAAI/bge-small-en-v1.5"
+
 
 class SemanticRecommender:
     def __init__(self) -> None:
-        self.model = SentenceTransformer(settings.EMBEDDING_MODEL_NAME)
+        self.model = TextEmbedding(model_name=FASTEMBED_MODEL_NAME)
         self.df: pd.DataFrame | None = None
         self.embeddings: np.ndarray | None = None
         self.similarity_matrix: np.ndarray | None = None
@@ -46,14 +51,13 @@ class SemanticRecommender:
             logger.warning("No content to fit the semantic model on.")
             return
 
-        # Use overview text (fall back to title if overview is empty)
         texts = [
             row["overview"] if row["overview"].strip() else row["title"]
             for _, row in self.df.iterrows()
         ]
 
-        logger.info("Encoding %d items with sentence-transformers...", len(texts))
-        self.embeddings = self.model.encode(texts, show_progress_bar=False)
+        logger.info("Encoding %d items with fastembed...", len(texts))
+        self.embeddings = np.array(list(self.model.embed(texts)))
         self.similarity_matrix = cosine_similarity(self.embeddings)
 
         self._id_to_index = {content_id: idx for idx, content_id in enumerate(self.df["id"])}
@@ -71,11 +75,10 @@ class SemanticRecommender:
             rows.append(
                 {
                     "content_id": content_id,
-                    "model_name": settings.EMBEDDING_MODEL_NAME,
+                    "model_name": FASTEMBED_MODEL_NAME,
                     "embedding": self.embeddings[idx].tolist(),
                 }
             )
-        # Upsert in batches to avoid oversized single requests
         batch_size = 50
         for i in range(0, len(rows), batch_size):
             batch = rows[i : i + batch_size]
@@ -106,6 +109,7 @@ class SemanticRecommender:
                 {
                     "content_id": row["id"],
                     "title": row["title"],
+                    "poster_url": row.get("poster_url"),
                     "similarity_score": round(float(score), 4),
                 }
             )
@@ -114,13 +118,12 @@ class SemanticRecommender:
     def search_by_text(self, query: str, top_n: int = 10) -> list[dict]:
         """
         Semantic search: embed a free-text query and find the most similar
-        content by meaning, not exact keywords. This is what powers natural
-        language search like 'space exploration and time travel'.
+        content by meaning, not exact keywords.
         """
         if self.df is None or self.embeddings is None:
             raise RuntimeError("Model has not been fitted. Call fit() first.")
 
-        query_embedding = self.model.encode([query])
+        query_embedding = np.array(list(self.model.embed([query])))
         scores = cosine_similarity(query_embedding, self.embeddings)[0]
 
         ranked = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)[:top_n]
